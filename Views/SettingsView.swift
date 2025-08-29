@@ -6,11 +6,17 @@ struct SettingsView: View {
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("enableNotifications") private var enableNotifications = true
     @AppStorage("dailyReminder") private var dailyReminder = false
-    @AppStorage("dailyReminderTime") private var dailyReminderTime = Date()
+    @AppStorage("dailyReminderTime") private var dailyReminderTimeInterval: Double = Date().timeIntervalSince1970
     @AppStorage("codeTheme") private var codeTheme = "Xcode Dark"
     @AppStorage("autoStartTimer") private var autoStartTimer = false
     @State private var showingExportAlert = false
     @State private var showingImportPicker = false
+    
+    // Backing Date via Double for broad iOS compatibility (AppStorage doesn't natively support Date on earlier iOS)
+    private var dailyReminderTime: Date {
+        get { Date(timeIntervalSince1970: dailyReminderTimeInterval) }
+        set { dailyReminderTimeInterval = newValue.timeIntervalSince1970 }
+    }
     
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -38,7 +44,14 @@ struct SettingsView: View {
                         Toggle("Daily Reminder", isOn: $dailyReminder)
                         
                         if dailyReminder {
-                            DatePicker("Reminder Time", selection: $dailyReminderTime, displayedComponents: .hourAndMinute)
+                            DatePicker(
+                                "Reminder Time",
+                                selection: Binding<Date>(
+                                    get: { dailyReminderTime },
+                                    set: { dailyReminderTime = $0 }
+                                ),
+                                displayedComponents: .hourAndMinute
+                            )
                         }
                     }
                 }
