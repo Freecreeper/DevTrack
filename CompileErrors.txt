@@ -1,0 +1,5 @@
+
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/ContentView.swift:42:50 Cannot find 'PersistenceController' in scope
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/DevTrackApp.swift:11:54 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<DataController>.Wrapper'
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/DevTrackApp.swift:11:79 Cannot convert value of type 'Binding<Subject>' to expected argument type 'NSManagedObjectContext'
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/DevTrackApp.swift:18:21 Cannot find 'NSPersistentContainer' in scope
