@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(Charts)
 import Charts
+#endif
 
 struct StatsView: View {
     // Sample data - in a real app, this would come from CoreData
@@ -45,33 +47,11 @@ struct StatsView: View {
                         .font(.headline)
                         .padding(.horizontal)
                     
-                    Chart {
-                        ForEach(weeklyData) { day in
-                            BarMark(
-                                x: .value("Day", day.day),
-                                y: .value("Hours", day.hours)
-                            )
-                            .foregroundStyle(LinearGradient(
-                                gradient: Gradient(colors: [.blue, .blue.opacity(0.5)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ))
-                            .cornerRadius(4)
-                        }
-                    }
-                    .frame(height: 200)
-                    .chartXAxis {
-                        AxisMarks(values: .automatic) { _ in
-                            AxisValueLabel()
-                        }
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading)
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
+                    WeeklyOverviewChartView(weeklyData: weeklyData)
+                        .padding()
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                 }
                 
                 // Project Distribution
@@ -200,6 +180,87 @@ struct InsightRow: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
         }
+    }
+}
+
+// MARK: - Weekly Overview (iOS 15 fallback)
+
+struct WeeklyOverviewChartView: View {
+    let weeklyData: [DailyStats]
+    
+    @ViewBuilder
+    var body: some View {
+#if canImport(Charts)
+        if #available(iOS 16.0, *) {
+            Chart {
+                ForEach(weeklyData) { day in
+                    BarMark(
+                        x: .value("Day", day.day),
+                        y: .value("Hours", day.hours)
+                    )
+                    .foregroundStyle(LinearGradient(
+                        gradient: Gradient(colors: [.blue, .blue.opacity(0.5)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ))
+                    .cornerRadius(4)
+                }
+            }
+            .frame(height: 200)
+            .chartXAxis {
+                AxisMarks(values: .automatic) { _ in
+                    AxisValueLabel()
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+        } else {
+            FallbackBarListView(weeklyData: weeklyData)
+        }
+#else
+        FallbackBarListView(weeklyData: weeklyData)
+#endif
+    }
+}
+
+struct FallbackBarListView: View {
+    let weeklyData: [DailyStats]
+    private var maxHours: Double { weeklyData.map { $0.hours }.max() ?? 1 }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(weeklyData) { day in
+                HStack(spacing: 8) {
+                    Text(day.day)
+                        .font(.caption)
+                        .frame(width: 32, alignment: .leading)
+                    
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color(.systemGray5))
+                                .frame(height: 10)
+                            
+                            Capsule()
+                                .fill(LinearGradient(
+                                    gradient: Gradient(colors: [.blue, Color.blue.opacity(0.5)]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                                .frame(width: CGFloat(day.hours / maxHours) * geometry.size.width, height: 10)
+                        }
+                    }
+                    .frame(height: 10)
+                    
+                    Text("\(String(format: "%.1f", day.hours))h")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 44, alignment: .trailing)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

@@ -19,6 +19,11 @@ struct SettingsView: View {
         set { dailyReminderTimeInterval = newValue.timeIntervalSince1970 }
     }
     
+    // iOS 14+ compatible CSV UTType
+    private var csvUTType: UTType {
+        UTType(filenameExtension: "csv") ?? .plainText
+    }
+    
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     
@@ -188,7 +193,7 @@ struct SettingsView: View {
             }
             .fileImporter(
                 isPresented: $showingImportPicker,
-                allowedContentTypes: [UTType.json, UTType.commaSeparatedText],
+                allowedContentTypes: [UTType.json, csvUTType],
                 allowsMultipleSelection: false
             ) { result in
                 switch result {
