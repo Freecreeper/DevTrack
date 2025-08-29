@@ -4,9 +4,11 @@ class TimerManager: ObservableObject {
     @Published var isRunning = false
     @Published var elapsedTime: TimeInterval = 0
     private var timer: Timer?
-    
+    @Published var startDate: Date?
+
     func start() {
         isRunning = true
+        startDate = Date()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             self.elapsedTime += 1
         }
@@ -21,6 +23,7 @@ class TimerManager: ObservableObject {
     func reset() {
         stop()
         elapsedTime = 0
+        startDate = nil
     }
     
     var timeString: String {
@@ -33,8 +36,25 @@ class TimerManager: ObservableObject {
 
 struct TimeTrackerView: View {
     @EnvironmentObject var timerManager: TimerManager
+    @EnvironmentObject var sessionStore: SessionStore
     @State private var projectName = ""
     @State private var showProjectInput = false
+    @State private var journalText = ""
+
+    // Editing
+    @State private var isEditing = false
+    @State private var editingId: UUID? = nil
+    @State private var editProjectName = ""
+    @State private var editNote = ""
+    @State private var editDate = Date()
+    
+    private var isJournalEmpty: Bool {
+        journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var recentSessions: [CodingSession] {
+        Array(sessionStore.sessions.prefix(10))
+    }
     
     var body: some View {
         NavigationView {
@@ -114,10 +134,45 @@ struct TimeTrackerView: View {
                         .padding(.horizontal)
                     
                     List {
-                        // Placeholder for recent sessions
-                        Text("No recent sessions")
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                        if recentSessions.isEmpty {
+                            Text("No recent sessions")
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            ForEach(recentSessions) { s in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(s.projectName)
+                                            .font(.subheadline)
+                                            .foregroundColor(.primary)
+                                        Text(s.startDate, style: .date)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(format(seconds: s.seconds))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        sessionStore.deleteSession(id: s.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    Button {
+                                        editingId = s.id
+                                        editProjectName = s.projectName
+                                        editNote = s.note
+                                        editDate = s.startDate
+                                        isEditing = true
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    .tint(.blue)
+                                }
+                            }
+                        }
                     }
                     .listStyle(InsetGroupedListStyle())
                 }
@@ -131,14 +186,44 @@ struct TimeTrackerView: View {
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .padding()
                         
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Journal (required)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            TextEditor(text: $journalText)
+                                .frame(minHeight: 120)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.secondary.opacity(0.2))
+                                )
+                                .padding(.bottom, 8)
+                        }
+                        .padding(.horizontal)
+                        
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(.secondary)
+                            Text((timerManager.startDate ?? Date()), style: .date)
+                            Text((timerManager.startDate ?? Date()), style: .time)
+                            Spacer()
+                        }
+                        .font(.caption)
+                        .padding(.horizontal)
+                        
                         Button("Save Session") {
-                            // TODO: Save session to CoreData
+                            // Persist session
+                            sessionStore.addSession(projectName: projectName.isEmpty ? "Untitled" : projectName,
+                                                    seconds: timerManager.elapsedTime,
+                                                    date: timerManager.startDate ?? Date(),
+                                                    note: journalText.trimmingCharacters(in: .whitespacesAndNewlines))
                             showProjectInput = false
                             timerManager.reset()
+                            projectName = ""
+                            journalText = ""
                         }
-                        .disabled(projectName.isEmpty)
+                        .disabled(isJournalEmpty)
                         .padding()
-                        .background(projectName.isEmpty ? Color.gray : Color.blue)
+                        .background(isJournalEmpty ? Color.gray : Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                         .padding()
@@ -149,13 +234,72 @@ struct TimeTrackerView: View {
                     })
                 }
             }
+            .sheet(isPresented: $isEditing) {
+                NavigationView {
+                    VStack {
+                        TextField("Project Name", text: $editProjectName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .padding()
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Journal")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            TextEditor(text: $editNote)
+                                .frame(minHeight: 120)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.secondary.opacity(0.2))
+                                )
+                        }
+                        .padding(.horizontal)
+                        
+                        DatePicker("Start", selection: $editDate, displayedComponents: [.date, .hourAndMinute])
+                            .datePickerStyle(.compact)
+                            .padding()
+                        
+                        Button("Save Changes") {
+                            if let id = editingId {
+                                sessionStore.updateSession(id: id,
+                                                          projectName: editProjectName.isEmpty ? "Untitled" : editProjectName,
+                                                          startDate: editDate,
+                                                          note: editNote)
+                            }
+                            isEditing = false
+                            editingId = nil
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .padding()
+                    }
+                    .navigationTitle("Edit Session")
+                    .navigationBarItems(trailing: Button("Cancel") {
+                        isEditing = false
+                        editingId = nil
+                    })
+                }
+            }
         }
     }
-}
+    
+    private func format(seconds: TimeInterval) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        let secs = Int(seconds) % 60
+        if hours > 0 {
+            return String(format: "%dh %02dm", hours, minutes)
+        } else {
+            return String(format: "%dm %02ds", minutes, secs)
+        }
+    }
+  }
 
 struct TimeTrackerView_Previews: PreviewProvider {
     static var previews: some View {
         TimeTrackerView()
             .environmentObject(TimerManager())
+            .environmentObject(SessionStore())
     }
 }

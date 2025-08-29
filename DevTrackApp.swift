@@ -4,12 +4,14 @@ import CoreData
 @main
 struct DevTrackApp: App {
     @StateObject private var dataController = DataController()
+    @StateObject private var sessionStore = SessionStore()
     @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(\.managedObjectContext, dataController.container.viewContext)
+                .environmentObject(sessionStore)
                 .preferredColorScheme(isDarkMode ? .dark : .light)
         }
     }

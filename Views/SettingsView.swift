@@ -3,6 +3,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @EnvironmentObject var sessionStore: SessionStore
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("enableNotifications") private var enableNotifications = true
     @AppStorage("dailyReminder") private var dailyReminder = false
@@ -229,24 +230,76 @@ struct SettingsView: View {
     }
     
     private func resetAllData() {
-        // TODO: Implement data reset logic
-        // This would clear CoreData and reset all @AppStorage values
-        print("Resetting all data...")
+        // Clear sessions
+        sessionStore.clearAll()
+        
+        // Reset preferences
+        isDarkMode = false
+        enableNotifications = true
+        dailyReminder = false
+        dailyReminderTimeInterval = Date().timeIntervalSince1970
+        codeTheme = "Xcode Dark"
+        autoStartTimer = false
+        UserDefaults.standard.synchronize()
     }
     
     private func exportData(format: String) {
-        // TODO: Implement data export logic
-        print("Exporting data as \(format)")
+        let url: URL?
+        if format.lowercased() == "json" {
+            url = sessionStore.exportJSON()
+        } else {
+            url = sessionStore.exportCSV()
+        }
+        guard let shareURL = url else { return }
+        shareFile(shareURL)
     }
     
     private func importData(from url: URL) {
-        // TODO: Implement data import logic
-        print("Importing data from \(url.lastPathComponent)")
+        var importedCount = 0
+        var errorToShow: Error?
+        let shouldStop = url.startAccessingSecurityScopedResource()
+        defer { if shouldStop { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let ext = url.pathExtension.lowercased()
+            if ext == "json" {
+                importedCount = try sessionStore.importJSON(from: url)
+            } else if ext == "csv" {
+                importedCount = try sessionStore.importCSV(from: url)
+            } else {
+                showAlert(title: "Unsupported File", message: "Please select a JSON or CSV file.")
+                return
+            }
+        } catch {
+            errorToShow = error
+        }
+        if let e = errorToShow {
+            showAlert(title: "Import Failed", message: e.localizedDescription)
+        } else {
+            showAlert(title: "Import Complete", message: "Imported \(importedCount) sessions.")
+        }
     }
     
     private func openURL(_ urlString: String) {
         if let url = URL(string: urlString) {
             UIApplication.shared.open(url)
+        }
+    }
+
+    // MARK: - Helpers
+    private func shareFile(_ url: URL) {
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootViewController = windowScene.windows.first?.rootViewController {
+            rootViewController.present(activityVC, animated: true)
+        }
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootViewController = windowScene.windows.first?.rootViewController {
+            rootViewController.present(alert, animated: true)
         }
     }
 }
@@ -371,5 +424,6 @@ struct AboutView: View {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
+            .environmentObject(SessionStore())
     }
 }

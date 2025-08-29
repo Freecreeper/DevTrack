@@ -4,31 +4,84 @@ import Charts
 #endif
 
 struct StatsView: View {
-    // Sample data - in a real app, this would come from CoreData
-    let weeklyData: [DailyStats] = [
-        DailyStats(day: "Mon", hours: 3.5, projects: 2),
-        DailyStats(day: "Tue", hours: 5.2, projects: 3),
-        DailyStats(day: "Wed", hours: 2.8, projects: 2),
-        DailyStats(day: "Thu", hours: 6.1, projects: 4),
-        DailyStats(day: "Fri", hours: 4.7, projects: 3),
-        DailyStats(day: "Sat", hours: 2.0, projects: 1),
-        DailyStats(day: "Sun", hours: 1.5, projects: 1)
-    ]
+    @EnvironmentObject var sessionStore: SessionStore
     
-    let projectData: [ProjectTime] = [
-        ProjectTime(name: "DevTrack App", hours: 12.5, color: .blue),
-        ProjectTime(name: "E-commerce Site", hours: 8.2, color: .green),
-        ProjectTime(name: "API Development", hours: 5.7, color: .orange),
-        ProjectTime(name: "Bug Fixes", hours: 3.2, color: .red),
-        ProjectTime(name: "Learning", hours: 4.0, color: .purple)
-    ]
+    // Derived data from the last 7 days
+    private var weeklyData: [DailyStats] {
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -6, to: todayStart)!
+        let end = cal.date(byAdding: .day, value: 1, to: todayStart)!
+        let sessions = sessionStore.sessions.filter { $0.startDate >= start && $0.startDate < end }
+        let df = DateFormatter()
+        df.locale = Locale.current
+        df.dateFormat = "EEE"
+        var result: [DailyStats] = []
+        for offset in (0..<7).reversed() {
+            let dayStart = cal.date(byAdding: .day, value: -offset, to: todayStart)!
+            let next = cal.date(byAdding: .day, value: 1, to: dayStart)!
+            let daySessions = sessions.filter { $0.startDate >= dayStart && $0.startDate < next }
+            let hours = daySessions.reduce(0.0) { $0 + $1.seconds } / 3600.0
+            let projects = Set(daySessions.map { $0.projectName })
+            result.append(DailyStats(day: df.string(from: dayStart), hours: hours, projects: projects.count))
+        }
+        return result
+    }
+    
+    private var projectData: [ProjectTime] {
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -6, to: todayStart)!
+        let end = cal.date(byAdding: .day, value: 1, to: todayStart)!
+        let sessions = sessionStore.sessions.filter { $0.startDate >= start && $0.startDate < end }
+        var totals: [String: Double] = [:]
+        for s in sessions {
+            totals[s.projectName, default: 0] += s.seconds / 3600.0
+        }
+        let palette: [Color] = [.blue, .green, .orange, .red, .purple, .pink, .teal, .indigo]
+        let sorted = totals.sorted { $0.value > $1.value }
+        return sorted.enumerated().map { idx, kv in
+            ProjectTime(name: kv.key, hours: kv.value, color: palette[idx % palette.count])
+        }
+    }
     
     var totalHoursThisWeek: Double {
         weeklyData.reduce(0) { $0 + $1.hours }
     }
     
     var averageDailyHours: Double {
-        weeklyData.reduce(0) { $0 + $1.hours } / Double(weeklyData.count)
+        guard !weeklyData.isEmpty else { return 0 }
+        return weeklyData.reduce(0) { $0 + $1.hours } / Double(weeklyData.count)
+    }
+    
+    private var maxProjectHours: Double {
+        projectData.map { $0.hours }.max() ?? 1
+    }
+    
+    private var mostProductiveDayName: String {
+        guard let best = weeklyData.max(by: { $0.hours < $1.hours }), best.hours > 0 else { return "—" }
+        return best.day
+    }
+    
+    private var focusedHours: Double {
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -6, to: todayStart)!
+        let end = cal.date(byAdding: .day, value: 1, to: todayStart)!
+        let sessions = sessionStore.sessions.filter { $0.startDate >= start && $0.startDate < end }
+        let secs = sessions.filter { $0.seconds >= 1800 }.reduce(0.0) { $0 + $1.seconds }
+        return secs / 3600.0
+    }
+    
+    private var averageSessionHours: Double {
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -6, to: todayStart)!
+        let end = cal.date(byAdding: .day, value: 1, to: todayStart)!
+        let sessions = sessionStore.sessions.filter { $0.startDate >= start && $0.startDate < end }
+        guard !sessions.isEmpty else { return 0 }
+        let totalSecs = sessions.reduce(0.0) { $0 + $1.seconds }
+        return (totalSecs / Double(sessions.count)) / 3600.0
     }
     
     var body: some View {
@@ -79,7 +132,7 @@ struct StatsView: View {
                                         
                                         Capsule()
                                             .fill(project.color)
-                                            .frame(width: (project.hours / projectData[0].hours) * (geometry.size.width - 100), height: 8)
+                                            .frame(width: CGFloat(project.hours / maxProjectHours) * (geometry.size.width - 100), height: 8)
                                     }
                                 }
                                 .frame(height: 8)
@@ -103,11 +156,11 @@ struct StatsView: View {
                         .padding(.horizontal)
                     
                     VStack(spacing: 16) {
-                        InsightRow(icon: "flame.fill", title: "Most Productive Day", value: "Thursday", color: .red)
+                        InsightRow(icon: "flame.fill", title: "Most Productive Day", value: mostProductiveDayName, color: .red)
                         Divider()
-                        InsightRow(icon: "clock.badge.checkmark.fill", title: "Focused Coding", value: "\(Int(totalHoursThisWeek * 0.65))h", color: .green)
+                        InsightRow(icon: "clock.badge.checkmark.fill", title: "Focused Coding", value: "\(String(format: "%.1f", focusedHours))h", color: .green)
                         Divider()
-                        InsightRow(icon: "hourglass", title: "Average Session", value: "2.3h", color: .blue)
+                        InsightRow(icon: "hourglass", title: "Average Session", value: "\(String(format: "%.1f", averageSessionHours))h", color: .blue)
                     }
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
@@ -287,6 +340,7 @@ struct StatsView_Previews: PreviewProvider {
         NavigationView {
             StatsView()
         }
+        .environmentObject(SessionStore())
         .preferredColorScheme(.dark)
     }
 }
