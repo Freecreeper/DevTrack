@@ -1,2 +1,2 @@
 
-/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/SettingsView.swift:9:6 'init(wrappedValue:_:store:)' is only available in iOS 18.0 or newer
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/SettingsView.swift:51:44 Cannot assign to property: 'self' is immutable
