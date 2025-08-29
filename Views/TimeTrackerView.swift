@@ -37,6 +37,7 @@ class TimerManager: ObservableObject {
 struct TimeTrackerView: View {
     @EnvironmentObject var timerManager: TimerManager
     @EnvironmentObject var sessionStore: SessionStore
+    @Binding var selectedTab: Int
     @State private var projectName = ""
     @State private var showProjectInput = false
     @State private var journalText = ""
@@ -212,11 +213,13 @@ struct TimeTrackerView: View {
                         
                         Button("Save Session") {
                             // Persist session
-                            sessionStore.addSession(projectName: projectName.isEmpty ? "Untitled" : projectName,
-                                                    seconds: timerManager.elapsedTime,
-                                                    date: timerManager.startDate ?? Date(),
-                                                    note: journalText.trimmingCharacters(in: .whitespacesAndNewlines))
+                            let newSession = sessionStore.addSession(projectName: projectName.isEmpty ? "Untitled" : projectName,
+                                                     seconds: timerManager.elapsedTime,
+                                                     date: timerManager.startDate ?? Date(),
+                                                     note: journalText.trimmingCharacters(in: .whitespacesAndNewlines))
                             showProjectInput = false
+                            sessionStore.deepLinkSessionId = newSession.id
+                            selectedTab = 1
                             timerManager.reset()
                             projectName = ""
                             journalText = ""
@@ -298,7 +301,7 @@ struct TimeTrackerView: View {
 
 struct TimeTrackerView_Previews: PreviewProvider {
     static var previews: some View {
-        TimeTrackerView()
+        TimeTrackerView(selectedTab: .constant(0))
             .environmentObject(TimerManager())
             .environmentObject(SessionStore())
     }

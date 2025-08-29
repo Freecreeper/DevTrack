@@ -30,16 +30,19 @@ struct CodingSession: Identifiable, Codable {
 
 final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [CodingSession] = []
+    @Published var deepLinkSessionId: UUID?
     
     init() {
         load()
     }
     
     // MARK: - CRUD
-    func addSession(projectName: String, seconds: TimeInterval, date: Date, note: String) {
+    @discardableResult
+    func addSession(projectName: String, seconds: TimeInterval, date: Date, note: String) -> CodingSession {
         let session = CodingSession(projectName: projectName, seconds: seconds, startDate: date, note: note)
         sessions.insert(session, at: 0)
         save()
+        return session
     }
     
     func updateSession(id: UUID, projectName: String? = nil, seconds: TimeInterval? = nil, startDate: Date? = nil, note: String? = nil) {

@@ -7,7 +7,7 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            TimeTrackerView()
+            TimeTrackerView(selectedTab: $selectedTab)
                 .environmentObject(timerManager)
                 .tabItem {
                     Label("Track", systemImage: "timer")

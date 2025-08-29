@@ -8,6 +8,40 @@ struct JournalEntry: Identifiable {
     var tags: [String]
 }
 
+// MARK: - Session Detail View
+
+struct JournalSessionDetailView: View {
+    let session: CodingSession
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(session.projectName.isEmpty ? "Untitled" : session.projectName)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Text(session.startDate.formatted(date: .complete, time: .shortened))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Duration: \(formatDuration(session.seconds))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 16)
+                
+                Divider()
+                
+                Text(session.note.isEmpty ? "(No details)" : session.note)
+                    .font(.body)
+                    .lineSpacing(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding()
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 class JournalStore: ObservableObject {
     @Published var entries: [JournalEntry] = []
     
@@ -40,18 +74,17 @@ class JournalStore: ObservableObject {
 }
 
 struct JournalView: View {
-    @StateObject private var journalStore = JournalStore()
-    @State private var isAddingEntry = false
+    @EnvironmentObject var sessionStore: SessionStore
     @State private var searchText = ""
+    @State private var selectedSessionId: UUID?
     
-    var filteredEntries: [JournalEntry] {
+    var filteredSessions: [CodingSession] {
         if searchText.isEmpty {
-            return journalStore.entries
+            return sessionStore.sessions
         } else {
-            return journalStore.entries.filter {
-                $0.title.localizedCaseInsensitiveContains(searchText) ||
-                $0.content.localizedCaseInsensitiveContains(searchText) ||
-                $0.tags.contains(where: { $0.localizedCaseInsensitiveContains(searchText) })
+            return sessionStore.sessions.filter {
+                $0.projectName.localizedCaseInsensitiveContains(searchText) ||
+                $0.note.localizedCaseInsensitiveContains(searchText)
             }
         }
     }
@@ -59,7 +92,7 @@ struct JournalView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if journalStore.entries.isEmpty {
+                if sessionStore.sessions.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "book")
                             .font(.system(size: 60))
@@ -67,7 +100,7 @@ struct JournalView: View {
                         Text("No Journal Entries Yet")
                             .font(.title2)
                             .fontWeight(.medium)
-                        Text("Tap the + button to add your first journal entry")
+                        Text("Start a timer, then save with a journal entry to see it here.")
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
@@ -76,55 +109,59 @@ struct JournalView: View {
                     .background(Color(.systemGroupedBackground))
                 } else {
                     List {
-                        ForEach(filteredEntries) { entry in
-                            NavigationLink(destination: JournalDetailView(entry: entry)) {
+                        ForEach(filteredSessions) { s in
+                            NavigationLink(
+                                destination: JournalSessionDetailView(session: s),
+                                tag: s.id,
+                                selection: $selectedSessionId
+                            ) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(entry.title)
+                                    Text(s.projectName.isEmpty ? "Untitled" : s.projectName)
                                         .font(.headline)
-                                    Text(entry.content)
+                                    Text(s.note.isEmpty ? "(No details)" : s.note)
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                         .lineLimit(2)
                                     HStack {
-                                        Text(entry.date.formatted(date: .abbreviated, time: .shortened))
+                                        Text(s.startDate.formatted(date: .abbreviated, time: .shortened))
                                             .font(.caption)
                                             .foregroundColor(.gray)
                                         Spacer()
-                                        ForEach(entry.tags.prefix(2), id: \.self) { tag in
-                                            Text(tag)
-                                                .font(.caption2)
-                                                .padding(4)
-                                                .background(Color.blue.opacity(0.1))
-                                                .cornerRadius(4)
-                                        }
+                                        Text(formatDuration(s.seconds))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
                                     .padding(.top, 4)
                                 }
                                 .padding(.vertical, 8)
                             }
                         }
-                        .onDelete(perform: deleteEntry)
                     }
                     .listStyle(InsetGroupedListStyle())
-                    .searchable(text: $searchText, prompt: "Search entries...")
+                    .searchable(text: $searchText, prompt: "Search notes...")
                 }
             }
             .navigationTitle("Journal")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { isAddingEntry = true }) {
-                        Image(systemName: "plus")
+            .onAppear {
+                if let id = sessionStore.deepLinkSessionId {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        selectedSessionId = id
+                        sessionStore.deepLinkSessionId = nil
                     }
                 }
             }
-            .sheet(isPresented: $isAddingEntry) {
-                AddJournalEntryView(journalStore: journalStore)
+            .onChange(of: sessionStore.deepLinkSessionId) { id in
+                guard let id = id else { return }
+                DispatchQueue.main.async {
+                    selectedSessionId = id
+                    sessionStore.deepLinkSessionId = nil
+                }
             }
         }
     }
     
     private func deleteEntry(at offsets: IndexSet) {
-        journalStore.deleteEntry(at: offsets)
+        // Legacy: journal entries are no longer used here.
     }
 }
 
@@ -231,5 +268,6 @@ struct JournalDetailView: View {
 struct JournalView_Previews: PreviewProvider {
     static var previews: some View {
         JournalView()
+            .environmentObject(SessionStore())
     }
 }
