@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("autoStartTimer") private var autoStartTimer = false
     @State private var showingExportAlert = false
     @State private var showingImportPicker = false
+    @State private var dailyReminderDate: Date = Date()
     
     // Backing Date via Double for broad iOS compatibility (AppStorage doesn't natively support Date on earlier iOS)
     private var dailyReminderTime: Date {
@@ -46,12 +47,15 @@ struct SettingsView: View {
                         if dailyReminder {
                             DatePicker(
                                 "Reminder Time",
-                                selection: Binding<Date>(
-                                    get: { dailyReminderTime },
-                                    set: { dailyReminderTime = $0 }
-                                ),
+                                selection: $dailyReminderDate,
                                 displayedComponents: .hourAndMinute
                             )
+                            .onAppear {
+                                dailyReminderDate = Date(timeIntervalSince1970: dailyReminderTimeInterval)
+                            }
+                            .onChange(of: dailyReminderDate) { newValue in
+                                dailyReminderTimeInterval = newValue.timeIntervalSince1970
+                            }
                         }
                     }
                 }
