@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @AppStorage("isDarkMode") private var isDarkMode = false
@@ -169,7 +171,7 @@ struct SettingsView: View {
             }
             .fileImporter(
                 isPresented: $showingImportPicker,
-                allowedContentTypes: [.json, .commaSeparatedText],
+                allowedContentTypes: [UTType.json, UTType.commaSeparatedText],
                 allowsMultipleSelection: false
             ) { result in
                 switch result {
