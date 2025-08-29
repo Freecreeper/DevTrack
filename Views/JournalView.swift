@@ -115,25 +115,7 @@ struct JournalView: View {
                                 tag: s.id,
                                 selection: $selectedSessionId
                             ) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(s.projectName.isEmpty ? "Untitled" : s.projectName)
-                                        .font(.headline)
-                                    Text(s.note.isEmpty ? "(No details)" : s.note)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                    HStack {
-                                        Text(s.startDate.formatted(date: .abbreviated, time: .shortened))
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                        Spacer()
-                                        Text(formatDuration(s.seconds))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding(.top, 4)
-                                }
-                                .padding(.vertical, 8)
+                                JournalRowView(session: s)
                             }
                         }
                     }
@@ -162,6 +144,44 @@ struct JournalView: View {
     
     private func deleteEntry(at offsets: IndexSet) {
         // Legacy: journal entries are no longer used here.
+    }
+}
+
+fileprivate func formatDuration(_ seconds: TimeInterval) -> String {
+    let total = Int(seconds)
+    let h = total / 3600
+    let m = (total % 3600) / 60
+    let s = total % 60
+    if h > 0 {
+        return String(format: "%dh %02dm", h, m)
+    } else {
+        return String(format: "%dm %02ds", m, s)
+    }
+}
+
+struct JournalRowView: View {
+    let session: CodingSession
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.projectName.isEmpty ? "Untitled" : session.projectName)
+                .font(.headline)
+            Text(session.note.isEmpty ? "(No details)" : session.note)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+            HStack {
+                Text(session.startDate.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Spacer()
+                Text(formatDuration(session.seconds))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+        }
+        .padding(.vertical, 8)
     }
 }
 
