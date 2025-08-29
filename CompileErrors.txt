@@ -1,2 +1,4 @@
 
-/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/SettingsView.swift:51:44 Cannot assign to property: 'self' is immutable
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/JournalView.swift:26:39 Cannot find 'formatDuration' in scope
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/JournalView.swift:92:25 The compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+/Users/ebugg/Downloads/Zanes things/DevTrack/DevTrack/DevTrack/Views/JournalView.swift:130:46 Cannot find 'formatDuration' in scope
